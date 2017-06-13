@@ -1,0 +1,204 @@
+OBJECT Table 70099 Address Format
+{
+  OBJECT-PROPERTIES
+  {
+    Date=12-06-17;
+    Time=15:46:48;
+    Modified=Yes;
+    Version List=Exercise 2;
+  }
+  PROPERTIES
+  {
+  }
+  FIELDS
+  {
+    { 2   ;   ;Name                ;Text50        ;CaptionML=ENU=Name }
+    { 4   ;   ;Name 2              ;Text50        ;CaptionML=ENU=Name 2 }
+    { 5   ;   ;Address             ;Text50        ;CaptionML=ENU=Address }
+    { 6   ;   ;Address 2           ;Text50        ;CaptionML=ENU=Address 2 }
+    { 7   ;   ;City                ;Text30        ;TableRelation=IF (Country/Region Code=CONST()) "Post Code".City
+                                                                 ELSE IF (Country/Region Code=FILTER(<>'')) "Post Code".City WHERE (Country/Region Code=FIELD(Country/Region Code));
+                                                   ValidateTableRelation=No;
+                                                   TestTableRelation=No;
+                                                   CaptionML=ENU=City }
+    { 8   ;   ;Contact             ;Text50        ;CaptionML=ENU=Contact }
+    { 35  ;   ;Country/Region Code ;Code10        ;TableRelation=Country/Region;
+                                                   CaptionML=ENU=Country/Region Code }
+    { 91  ;   ;Post Code           ;Code20        ;TableRelation=IF (Country/Region Code=CONST()) "Post Code"
+                                                                 ELSE IF (Country/Region Code=FILTER(<>'')) "Post Code" WHERE (Country/Region Code=FIELD(Country/Region Code));
+                                                   ValidateTableRelation=No;
+                                                   TestTableRelation=No;
+                                                   CaptionML=ENU=Post Code }
+    { 92  ;   ;County              ;Text30        ;CaptionML=ENU=County }
+  }
+  KEYS
+  {
+    {    ;Name                                    ;Clustered=Yes }
+  }
+  FIELDGROUPS
+  {
+  }
+  CODE
+  {
+
+    PROCEDURE FormatAddr@1(VAR AddrArray@1000 : ARRAY [8] OF Text[90]);
+    VAR
+      GLSetup@1000000000 : Record 98;
+      Country@1010 : Record 9;
+      InsertText@1011 : Integer;
+      Index@1012 : Integer;
+      NameLineNo@1013 : Integer;
+      Name2LineNo@1014 : Integer;
+      AddrLineNo@1015 : Integer;
+      Addr2LineNo@1016 : Integer;
+      ContLineNo@1017 : Integer;
+      PostCodeCityLineNo@1018 : Integer;
+      CountyLineNo@1019 : Integer;
+      CountryLineNo@1020 : Integer;
+    BEGIN
+      CLEAR(AddrArray);
+
+      IF "Country/Region Code" = '' THEN BEGIN
+        GLSetup.GET;
+        CLEAR(Country);
+        Country."Address Format" := GLSetup."Local Address Format";
+        Country."Contact Address Format" := GLSetup."Local Cont. Addr. Format";
+      END ELSE
+        Country.GET("Country/Region Code");
+
+      CASE Country."Contact Address Format" OF
+        Country."Contact Address Format"::First:
+          BEGIN
+            NameLineNo := 2;
+            Name2LineNo := 3;
+            ContLineNo := 1;
+            AddrLineNo := 4;
+            Addr2LineNo := 5;
+            PostCodeCityLineNo := 6;
+            CountyLineNo := 7;
+            CountryLineNo := 8;
+          END;
+        Country."Contact Address Format"::"After Company Name":
+          BEGIN
+            NameLineNo := 1;
+            Name2LineNo := 2;
+            ContLineNo := 3;
+            AddrLineNo := 4;
+            Addr2LineNo := 5;
+            PostCodeCityLineNo := 6;
+            CountyLineNo := 7;
+            CountryLineNo := 8;
+          END;
+        Country."Contact Address Format"::Last:
+          BEGIN
+            NameLineNo := 1;
+            Name2LineNo := 2;
+            ContLineNo := 8;
+            AddrLineNo := 3;
+            Addr2LineNo := 4;
+            PostCodeCityLineNo := 5;
+            CountyLineNo := 6;
+            CountryLineNo := 7;
+          END;
+      END;
+
+      AddrArray[NameLineNo] := Name;
+      AddrArray[Name2LineNo] := "Name 2";
+      AddrArray[AddrLineNo] := Address;
+      AddrArray[Addr2LineNo] := "Address 2";
+
+      CASE Country."Address Format" OF
+        Country."Address Format"::"Post Code+City",
+        Country."Address Format"::"City+County+Post Code",
+        Country."Address Format"::"City+Post Code":
+          BEGIN
+            AddrArray[ContLineNo] := Contact;
+            GeneratePostCodeCity(AddrArray[PostCodeCityLineNo],AddrArray[CountyLineNo],City,"Post Code",County,Country);
+            AddrArray[CountryLineNo] := Country.Name;
+            COMPRESSARRAY(AddrArray);
+          END;
+        Country."Address Format"::"Blank Line+Post Code+City":
+          BEGIN
+            IF ContLineNo < PostCodeCityLineNo THEN
+              AddrArray[ContLineNo] := Contact;
+            COMPRESSARRAY(AddrArray);
+
+            Index := 1;
+            InsertText := 1;
+            REPEAT
+              IF AddrArray[Index] = '' THEN BEGIN
+                CASE InsertText OF
+                  2:
+                    GeneratePostCodeCity(AddrArray[Index],AddrArray[Index + 1],City,"Post Code",County,Country);
+                  3:
+                    AddrArray[Index] := Country.Name;
+                  4:
+                    IF ContLineNo > PostCodeCityLineNo THEN
+                      AddrArray[Index] := Contact;
+                END;
+                InsertText := InsertText + 1;
+              END;
+              Index := Index + 1;
+            UNTIL Index = 9;
+
+          END;
+      END;
+    END;
+
+    LOCAL PROCEDURE GeneratePostCodeCity@31(VAR PostCodeCityText@1000 : Text[90];VAR CountyText@1001 : Text[50];City@1002 : Text[50];PostCode@1003 : Code[20];County@1004 : Text[50];Country@1005 : Record 9);
+    VAR
+      DummyString@1007 : Text;
+      OverMaxStrLen@1006 : Integer;
+    BEGIN
+      DummyString := '';
+      OverMaxStrLen := MAXSTRLEN(PostCodeCityText);
+      IF OverMaxStrLen < MAXSTRLEN(DummyString) THEN
+        OverMaxStrLen += 1;
+
+      CASE Country."Address Format" OF
+        Country."Address Format"::"Post Code+City":
+          BEGIN
+            IF PostCode <> '' THEN
+              PostCodeCityText := DELSTR(PostCode + ' ' + City,OverMaxStrLen)
+            ELSE
+              PostCodeCityText := City;
+            CountyText := County;
+          END;
+        Country."Address Format"::"City+County+Post Code":
+          BEGIN
+            IF (County <> '') AND (PostCode <> '') THEN
+              PostCodeCityText :=
+                DELSTR(City,MAXSTRLEN(PostCodeCityText) - STRLEN(PostCode) - STRLEN(County) - 3) +
+                ', ' + County + '  ' + PostCode
+            ELSE
+              IF PostCode = '' THEN BEGIN
+                PostCodeCityText := City;
+                CountyText := County;
+              END ELSE
+                IF (County = '') AND (PostCode <> '') THEN
+                  PostCodeCityText := DELSTR(City,MAXSTRLEN(PostCodeCityText) - STRLEN(PostCode) - 1) + ', ' + PostCode;
+          END;
+        Country."Address Format"::"City+Post Code":
+          BEGIN
+            IF PostCode <> '' THEN
+              PostCodeCityText := DELSTR(City,MAXSTRLEN(PostCodeCityText) - STRLEN(PostCode) - 1) + ', ' + PostCode
+            ELSE
+              PostCodeCityText := City;
+            CountyText := County;
+          END;
+        Country."Address Format"::"Blank Line+Post Code+City":
+          BEGIN
+            IF PostCode <> '' THEN
+              PostCodeCityText := DELSTR(PostCode + ' ' + City,OverMaxStrLen)
+            ELSE
+              PostCodeCityText := City;
+            CountyText := County;
+          END;
+      END;
+    END;
+
+    BEGIN
+    END.
+  }
+}
+

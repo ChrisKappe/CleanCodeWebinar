@@ -1,0 +1,28 @@
+OBJECT Codeunit 70098 Test Runner
+{
+  OBJECT-PROPERTIES
+  {
+    Date=12-06-17;
+    Time=14:24:31;
+    Modified=Yes;
+    Version List=;
+  }
+  PROPERTIES
+  {
+    Subtype=TestRunner;
+    TestIsolation=Codeunit;
+    OnRun=VAR
+            TestFormatAddress@1000000000 : Codeunit 70099;
+          BEGIN
+            TestFormatAddress.RUN;
+          END;
+
+  }
+  CODE
+  {
+
+    BEGIN
+    END.
+  }
+}
+

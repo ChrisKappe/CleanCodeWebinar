@@ -1,0 +1,60 @@
+OBJECT Codeunit 70099 Test Format Address
+{
+  OBJECT-PROPERTIES
+  {
+    Date=12-06-17;
+    Time=15:25:57;
+    Modified=Yes;
+    Version List=;
+  }
+  PROPERTIES
+  {
+    Subtype=Test;
+    OnRun=BEGIN
+          END;
+
+  }
+  CODE
+  {
+
+    [Test]
+    PROCEDURE CreateCustomer@1000000000();
+    VAR
+      Customer@1000000000 : Record 18;
+    BEGIN
+      Customer.INIT;
+      Customer."No." := '10';
+      Customer.Name := 'Mark';
+      Customer.Address := 'Somewhere';
+      Customer."Post Code" := 'NL-1234 AA';
+      Customer.City := 'Else';
+      Customer.INSERT(TRUE);
+    END;
+
+    [Test]
+    PROCEDURE TestResult@1000000001();
+    VAR
+      Customer@1000000002 : Record 18;
+      AddrArray@1000000001 : ARRAY [8] OF Text[90];
+    BEGIN
+      Customer.GET('10');
+
+      Customer.FormatAddress(AddrArray);
+      IF AddrArray[1] <> 'Mark' THEN
+        ThrowError(AddrArray[1], 'Mark');
+      IF AddrArray[2] <> 'Somewhere' THEN
+        ThrowError(AddrArray[2], 'Somewhere');
+      IF AddrArray[3] <> 'Else, NL-1234 AA' THEN
+        ThrowError(AddrArray[3], 'Else, NL-1234 AA');
+    END;
+
+    PROCEDURE ThrowError@1000000004(Value@1000000000 : Text;ExpectedValue@1000000001 : Text);
+    BEGIN
+      ERROR('Testing addresses has an unexpected result ' + Value + ' ' + ExpectedValue);
+    END;
+
+    BEGIN
+    END.
+  }
+}
+
